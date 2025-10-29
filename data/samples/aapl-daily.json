@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "symbol": "AAPL",
+    "lastRefreshed": "2024-01-05"
+  },
+  "rows": [
+    { "time": "2024-01-02", "values": { "open": 185.0, "close": 186.2, "sma_20": 184.5, "sma_50": 180.1, "pct_change_30": 0.04 } },
+    { "time": "2024-01-03", "values": { "open": 186.4, "close": 187.1, "sma_20": 185.1, "sma_50": 180.6, "pct_change_30": 0.045 } },
+    { "time": "2024-01-04", "values": { "open": 187.0, "close": 188.3, "sma_20": 185.8, "sma_50": 181.0, "pct_change_30": 0.048 } },
+    { "time": "2024-01-05", "values": { "open": 188.5, "close": 189.7, "sma_20": 186.2, "sma_50": 181.3, "pct_change_30": 0.052 } }
+  ]
+}

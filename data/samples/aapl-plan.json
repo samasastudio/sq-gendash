@@ -1,0 +1,47 @@
+{
+  "title": "AAPL Daily — Close & KPI",
+  "description": "AAPL close price with simple moving averages",
+  "datasets": [
+    {
+      "id": "aapl_daily",
+      "source": "alphaVantage",
+      "function": "TIME_SERIES_DAILY",
+      "symbol": "AAPL",
+      "indicators": [
+        { "type": "SMA", "period": 20, "sourceField": "close" },
+        { "type": "SMA", "period": 50, "sourceField": "close" },
+        { "type": "PCT_CHANGE", "period": 30, "sourceField": "close", "target": "pct_change_30" }
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "type": "kpi",
+      "title": "AAPL Latest Close",
+      "datasetId": "aapl_daily",
+      "agg": "latest",
+      "field": "close",
+      "format": "currency"
+    },
+    {
+      "type": "kpi",
+      "title": "AAPL 30d % Change",
+      "datasetId": "aapl_daily",
+      "agg": "latest",
+      "field": "pct_change_30",
+      "format": "percent"
+    },
+    {
+      "type": "line",
+      "title": "AAPL Close with 20/50 SMA",
+      "datasetId": "aapl_daily",
+      "x": "time",
+      "y": ["close", "sma_20", "sma_50"]
+    }
+  ],
+  "layout": [
+    { "widgetIndex": 0, "w": 4, "h": 2, "x": 0, "y": 0 },
+    { "widgetIndex": 1, "w": 4, "h": 2, "x": 4, "y": 0 },
+    { "widgetIndex": 2, "w": 12, "h": 6, "x": 0, "y": 2 }
+  ]
+}
