@@ -119,9 +119,56 @@ User → /api/plan → (LLM) → plan.json → Client → /api/alpha → AlphaVa
 
 ## Environment & Config
 
-- `ALPHA_VANTAGE_API_KEY` — required.
-- `HF_API_KEY` — required (provider can be swapped later).
-- **Default granularity**: **daily**; intraday only when explicitly requested in the prompt.
+### Required variables
+
+| Name                       | Required                               | Used by               | Notes                                                                           |
+| -------------------------- | -------------------------------------- | --------------------- | ------------------------------------------------------------------------------- |
+| `ALPHA_VANTAGE_API_KEY`    | ✅                                     | `/api/alpha` (server) | **Do not** expose on client; never prefix with `NEXT_PUBLIC_`.                  |
+| `HF_API_KEY`               | ✅ (if using Hugging Face)             | `/api/plan` (server)  | Vercel AI SDK v5 + Hugging Face Inference.                                      |
+| `OPENAI_API_KEY`           | Optional (only if you switch provider) | `/api/plan` (server)  | Keep but don’t use unless you change provider.                                  |
+| `MODEL_PROVIDER`           | Optional                               | `/api/plan` (server)  | e.g., `huggingface` (default) or `openai`.                                      |
+| `HF_MODEL_ID`              | Optional                               | `/api/plan` (server)  | e.g., `meta-llama/Meta-Llama-3.1-8B-Instruct`. Leave empty to use code default. |
+| `ALPHA_CACHE_TTL_INTRADAY` | Optional                               | `/api/alpha` (server) | ms; default ~15m if unset.                                                      |
+| `ALPHA_CACHE_TTL_DAILY`    | Optional                               | `/api/alpha` (server) | ms; default ~6h if unset.                                                       |
+
+> For Phase 1 you **don’t need any** `NEXT_PUBLIC_*` vars. All secrets stay server‑side.
+
+### Set them in CodeSandbox
+
+1. Open your sandbox → **Secrets** panel (Environment/Secrets).
+2. Add:
+
+   - `ALPHA_VANTAGE_API_KEY=...`
+   - `HF_API_KEY=...` (and optionally `OPENAI_API_KEY`, `MODEL_PROVIDER`, `HF_MODEL_ID`)
+
+3. **Restart** the server/container to apply.
+4. (Optional) Using a file: create `.env.local` with the same keys; Secrets is preferred for privacy.
+
+**Quick validation**
+
+- Visit `/api/alpha?fn=TIME_SERIES_DAILY&symbol=AAPL` in the preview → JSON without a rate‑limit "Note".
+- Submit a simple prompt (e.g., “AAPL daily close with a KPI and a line chart”). `/api/plan` should return a JSON `plan`.
+
+### Set them in OpenAI “Codex” / ChatGPT **Projects**
+
+> Projects don’t run your Next.js app; secrets here are for assistants/tools **inside ChatGPT**. You still must set env vars in CodeSandbox (or Vercel) for the live app.
+
+1. Open your **Generative UI Project** → **Project Settings → Secrets**.
+2. Add the same keys:
+
+   - `ALPHA_VANTAGE_API_KEY`
+   - `HF_API_KEY`
+   - (optional) `OPENAI_API_KEY`, `MODEL_PROVIDER`, `HF_MODEL_ID`
+
+3. If the repo is private, ensure the **GitHub connector** is authorized for `samasastudio/sq-gendash`.
+
+### Optional: provider switch
+
+```
+MODEL_PROVIDER=huggingface   # or: openai
+HF_MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+OPENAI_API_KEY=sk-...        # only if using openai
+```
 
 ---
 
