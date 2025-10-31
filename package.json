@@ -8,7 +8,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "postinstall": "node -e \"console.log('Dependencies installed')\""
   },
   "engines": {
@@ -16,32 +17,32 @@
   },
   "packageManager": "pnpm@9.0.0",
   "dependencies": {
+    "@ai-sdk/huggingface": "^0.0.7",
+    "ag-grid-community": "^32.0.0",
+    "ag-grid-react": "^32.0.0",
+    "ai": "^5.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-
-    "ai": "^5.0.0",
-    "@ai-sdk/huggingface": "^0.0.7",
-    "zod": "^3.23.8",
-
-    "ag-grid-community": "^32.0.0",
-    "ag-grid-react": "^32.0.0",
     "recharts": "^2.12.0",
-
-    "clsx": "^2.1.1",
-    "class-variance-authority": "^0.7.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.6.2",
+    "@eslint/js": "^9.38.0",
     "@types/node": "^22.5.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-
-    "tailwindcss": "^3.4.13",
-    "postcss": "^8.4.47",
     "autoprefixer": "^10.4.20",
-
-    "eslint": "^9.10.0",
-    "eslint-config-next": "^16.0.0"
+    "eslint": "9.38.0",
+    "eslint-config-next": "^16.0.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.46.2"
   }
 }
