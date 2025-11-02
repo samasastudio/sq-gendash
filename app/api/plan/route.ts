@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHfModel } from "@ai-sdk/huggingface";
+import { createHuggingFace } from "@ai-sdk/huggingface";
 import { generateObject } from "ai";
 import {
   DashboardPlanSchema,
@@ -9,10 +9,14 @@ import {
 const DEFAULT_MODEL =
   process.env.HF_MODEL_ID ?? "meta-llama/Meta-Llama-3.1-8B-Instruct";
 
-function hfModel() {
+const hfProvider = (() => {
   const apiKey = process.env.HF_API_KEY;
   if (!apiKey) return null;
-  return createHfModel({ apiKey, model: DEFAULT_MODEL });
+  return createHuggingFace({ apiKey });
+})();
+
+function hfModel() {
+  return hfProvider?.text(DEFAULT_MODEL) ?? null;
 }
 
 export async function POST(req: NextRequest) {
