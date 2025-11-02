@@ -9,30 +9,49 @@ import {
 const DEFAULT_MODEL =
   process.env.HF_MODEL_ID ?? "meta-llama/Meta-Llama-3.1-8B-Instruct";
 
-const hfProvider = (() => {
-  const apiKey = process.env.HF_API_KEY;
-  if (!apiKey) return null;
-  return createHuggingFace({ apiKey });
-})();
+function readPrompt(body: unknown): string | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
 
-function hfModel() {
-  return hfProvider?.text(DEFAULT_MODEL) ?? null;
+  const value = (body as { prompt?: unknown }).prompt;
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 }
 
 export async function POST(req: NextRequest) {
-  const { prompt } = (await req.json().catch(() => ({}))) as {
-    prompt?: string;
-  };
+  let prompt: string | null = null;
 
-  if (!prompt || !prompt.trim()) {
+  try {
+    prompt = readPrompt(await req.json());
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    console.error("Failed to read request body", error);
+    return NextResponse.json(
+      { error: "Failed to read request body" },
+      { status: 400 }
+    );
+  }
+
+  if (!prompt) {
     return NextResponse.json(
       { error: "Prompt is required" },
       { status: 400 }
     );
   }
 
-  const model = hfModel();
-  if (!model) {
+  const apiKey = process.env.HF_API_KEY;
+  if (!apiKey) {
     return NextResponse.json({
       plan: SAMPLE_PLAN,
       cached: true,
@@ -41,8 +60,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const hf = createHuggingFace({ apiKey });
     const { object } = await generateObject({
-      model,
+      model: hf.text(DEFAULT_MODEL),
       schema: DashboardPlanSchema,
       system:
         "You are a strict dashboard planning assistant. Return only valid JSON that matches the provided schema.",
