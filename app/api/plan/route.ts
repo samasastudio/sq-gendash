@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   try {
     const hf = createHuggingFace({ apiKey });
     const { object } = await generateObject({
-      model: hf.text(DEFAULT_MODEL),
+      model: hf(DEFAULT_MODEL),
       schema: DashboardPlanSchema,
       system:
         "You are a strict dashboard planning assistant. Return only valid JSON that matches the provided schema.",
