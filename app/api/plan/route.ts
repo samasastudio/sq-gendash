@@ -130,19 +130,7 @@ function extractJsonObject(text: string): unknown {
 
   const jsonSlice = candidate.slice(start, end + 1);
   const attempts = buildJsonRepairAttempts(jsonSlice);
-
-  let lastError: unknown = null;
-  for (const attempt of attempts) {
-    try {
-      return JSON.parse(attempt);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  const reason =
-    lastError instanceof Error ? lastError.message : "Failed to parse JSON";
-  throw new Error(`Failed to parse JSON from LLM response: ${reason}`);
+  return parseJsonWithRepairs(attempts);
 }
 
 class PlanBuildError extends Error {
@@ -250,4 +238,23 @@ function convertSingleQuotes(value: string): string {
     .replace(/(:\s*)'([^'\\]*(?:\\.[^'\\]*)*)'(\s*(?:,|}|\]))/g, (_match, prefix, content, suffix) => {
       return `${prefix}"${content}"${suffix}`;
     });
+}
+
+function parseJsonWithRepairs(
+  attempts: string[],
+  lastError: unknown = null
+): unknown {
+  if (!attempts.length) {
+    const reason =
+      lastError instanceof Error ? lastError.message : "Failed to parse JSON";
+    throw new Error(`Failed to parse JSON from LLM response: ${reason}`);
+  }
+
+  const [attempt, ...remaining] = attempts;
+
+  try {
+    return JSON.parse(attempt);
+  } catch (error) {
+    return parseJsonWithRepairs(remaining, error);
+  }
 }
