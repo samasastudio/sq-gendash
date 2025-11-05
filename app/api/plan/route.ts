@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHuggingFace } from "@ai-sdk/huggingface";
-import { generateObject } from "ai";
-import {
-  DashboardPlanSchema,
-  SAMPLE_PLAN,
-} from "@/app/(lib)/plan-schema";
+import { generateText } from "ai";
+import { DashboardPlanSchema, SAMPLE_PLAN } from "@/app/(lib)/plan-schema";
 
 const DEFAULT_MODEL =
-  process.env.HF_MODEL_ID ?? "meta-llama/Meta-Llama-3.1-8B-Instruct";
+  process.env.HF_MODEL_ID ?? "meta-llama/Llama-3.1-8B-Instruct";
 
 function readPrompt(body: unknown): string | null {
   if (!body || typeof body !== "object") {
@@ -30,10 +27,7 @@ export async function POST(req: NextRequest) {
     prompt = readPrompt(await req.json());
   } catch (error) {
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
     console.error("Failed to read request body", error);
@@ -44,10 +38,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!prompt) {
-    return NextResponse.json(
-      { error: "Prompt is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
   const apiKey = process.env.HF_API_KEY;
@@ -61,9 +52,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const hf = createHuggingFace({ apiKey });
-    const { object } = await generateObject({
+    const { text } = await generateText({
       model: hf(DEFAULT_MODEL),
-      schema: DashboardPlanSchema,
       system:
         "You are a strict dashboard planning assistant. Return only valid JSON that matches the provided schema.",
       prompt: [
@@ -75,8 +65,19 @@ export async function POST(req: NextRequest) {
       ].join("\n"),
     });
 
-    return NextResponse.json({ plan: object, cached: false });
+    const plan = buildPlanFromResponse(text);
+    return NextResponse.json({ plan, cached: false });
   } catch (error) {
+    if (error instanceof PlanBuildError) {
+      console.warn("Falling back to sample plan", error.detail);
+      return NextResponse.json({
+        plan: SAMPLE_PLAN,
+        cached: true,
+        note: "LLM response could not be parsed — returning sample plan",
+        detail: error.detail,
+      });
+    }
+
     console.error("Failed to generate plan", error);
     return NextResponse.json(
       {
@@ -86,5 +87,61 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+function buildPlanFromResponse(text: string) {
+  try {
+    const extracted = extractJsonObject(text);
+    const parsed = DashboardPlanSchema.safeParse(extracted);
+
+    if (!parsed.success) {
+      console.warn("LLM returned invalid plan", {
+        issues: parsed.error.issues,
+        raw: text,
+      });
+      throw new PlanBuildError("LLM returned invalid plan", {
+        issues: parsed.error.issues,
+        rawText: text,
+      });
+    }
+
+    return parsed.data;
+  } catch (error) {
+    if (error instanceof PlanBuildError) {
+      throw error;
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Unexpected plan build error";
+    throw new PlanBuildError(message, { rawText: text });
+  }
+}
+
+function extractJsonObject(text: string): unknown {
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fenceMatch ? fenceMatch[1] : text).trim();
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || start >= end) {
+    throw new Error("LLM response did not contain a JSON object");
+  }
+
+  const jsonSlice = candidate.slice(start, end + 1);
+  try {
+    return JSON.parse(jsonSlice);
+  } catch {
+    throw new Error("Failed to parse JSON from LLM response");
+  }
+}
+
+class PlanBuildError extends Error {
+  constructor(
+    message: string,
+    public readonly detail?: unknown
+  ) {
+    super(message);
+    this.name = "PlanBuildError";
   }
 }
