@@ -129,11 +129,8 @@ function extractJsonObject(text: string): unknown {
   }
 
   const jsonSlice = candidate.slice(start, end + 1);
-  try {
-    return JSON.parse(jsonSlice);
-  } catch {
-    throw new Error("Failed to parse JSON from LLM response");
-  }
+  const attempts = buildJsonRepairAttempts(jsonSlice);
+  return parseJsonWithRepairs(attempts);
 }
 
 class PlanBuildError extends Error {
@@ -143,5 +140,121 @@ class PlanBuildError extends Error {
   ) {
     super(message);
     this.name = "PlanBuildError";
+  }
+}
+
+function buildJsonRepairAttempts(source: string): string[] {
+  const transformations: Array<(value: string) => string> = [
+    (value) => value,
+    (value) => value.replace(/\r\n?/g, "\n"),
+    normalizeSmartQuotes,
+    removeTrailingCommas,
+    convertSingleQuotes,
+  ];
+
+  const finalState = transformations.reduce(
+    (state, transform) => {
+      const nextValue = transform(state.current);
+      const normalized = nextValue.trim();
+
+      if (!normalized || state.attempts.includes(normalized)) {
+        return { attempts: state.attempts, current: nextValue };
+      }
+
+      return {
+        attempts: [...state.attempts, normalized],
+        current: nextValue,
+      };
+    },
+    { attempts: [] as string[], current: source }
+  );
+
+  return finalState.attempts;
+}
+
+function normalizeSmartQuotes(value: string): string {
+  return value.replace(/[“”]/g, "\"").replace(/[‘’‚‛]/g, "'");
+}
+
+function removeTrailingCommas(value: string): string {
+  const characters = Array.from(value);
+  type TrailingCommaState = {
+    result: string;
+    inString: boolean;
+    delimiter: '"' | "'" | null;
+    backslashRun: number;
+  };
+
+  const finalState = characters.reduce<TrailingCommaState>(
+    (state, char, index) => {
+      if (!char) {
+        return state;
+      }
+
+      const isQuote = char === '"' || char === "'";
+      const isEscapedQuote = isQuote && state.inString && state.backslashRun % 2 === 1;
+
+      const toggled = !isQuote || isEscapedQuote
+        ? { inString: state.inString, delimiter: state.delimiter }
+        : state.inString
+          ? state.delimiter === char
+            ? { inString: false, delimiter: null }
+            : { inString: state.inString, delimiter: state.delimiter }
+          : { inString: true, delimiter: char as '"' | "'" };
+
+      const nextRelevant =
+        !toggled.inString && char === ","
+          ? characters.slice(index + 1).find((nextChar) => !/\s/.test(nextChar))
+          : undefined;
+
+      const shouldSkip =
+        !toggled.inString &&
+        char === "," &&
+        (nextRelevant === "}" || nextRelevant === "]");
+
+      const appendedResult = shouldSkip ? state.result : `${state.result}${char}`;
+
+      const nextBackslashRun =
+        toggled.inString && char === "\\" ? state.backslashRun + 1 : 0;
+
+      return {
+        result: appendedResult,
+        inString: toggled.inString,
+        delimiter: toggled.delimiter,
+        backslashRun: nextBackslashRun,
+      };
+    },
+    { result: "", inString: false, delimiter: null, backslashRun: 0 }
+  );
+
+  return finalState.result;
+}
+
+function convertSingleQuotes(value: string): string {
+  return value
+    .replace(/([[{,]\s*)'([^'\\]*(?:\\.[^'\\]*)*)'(\s*:)/g, (_match, prefix, content, suffix) => {
+      return `${prefix}"${content}"${suffix}`;
+    })
+    .replace(/(:\s*)'([^'\\]*(?:\\.[^'\\]*)*)'(\s*(?:,|}|\]))/g, (_match, prefix, content, suffix) => {
+      return `${prefix}"${content}"${suffix}`;
+    });
+}
+
+function parseJsonWithRepairs(
+  attempts: string[],
+  lastError: unknown = null
+): unknown {
+  if (!attempts.length) {
+    const reason =
+      lastError instanceof Error ? lastError.message : "Failed to parse JSON";
+    throw new Error(`Failed to parse JSON from LLM response: ${reason}`);
+  }
+
+  const [attempt, ...remaining] = attempts;
+
+  try {
+    return JSON.parse(attempt);
+  } catch (error) {
+    return parseJsonWithRepairs(remaining, error);
   }
 }
